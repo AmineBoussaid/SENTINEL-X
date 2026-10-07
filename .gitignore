@@ -5,3 +5,6 @@
 .vscode/ipch
 
 visages_connus/
+
+__pycache__/
+sentinel.db
