@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+
+<html lang="fr">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <title>
+        SENTINEL-X
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/style.css') }}"
+    >
+
+</head>
+
+<body>
+
+<div class="layout">
+
+    <aside class="sidebar">
+
+        <div class="logo">
+
+            <div class="logo-icon">
+                SX
+            </div>
+
+            <div>
+                <h2>SENTINEL-X</h2>
+                <span>Security Platform</span>
+            </div>
+
+        </div>
+
+
+        <nav>
+
+            <a href="/">
+                Tableau de bord
+            </a>
+
+            <a href="/alertes">
+                Alertes
+            </a>
+
+            <a href="/architecture">
+                Architecture
+            </a>
+
+            <a href="/cablage">
+                Câblage
+            </a>
+
+            <a href="/parametres">
+                Paramètres
+            </a>
+
+        </nav>
+
+
+        <div class="sidebar-footer">
+
+            <span class="dot"></span>
+
+            Système connecté
+
+        </div>
+
+    </aside>
+
+
+    <main>
+
+        <header>
+
+            <div>
+
+                <h1>
+                    {% block titre %}
+                    SENTINEL-X
+                    {% endblock %}
+                </h1>
+
+                <p>
+                    Plateforme intelligente de surveillance
+                </p>
+
+            </div>
+
+
+            <div class="system-badge">
+
+                <span class="dot"></span>
+
+                ACTIF
+
+            </div>
+
+        </header>
+
+
+        <section class="content">
+
+            {% block contenu %}
+            {% endblock %}
+
+        </section>
+
+    </main>
+
+</div>
+
+
+{% block scripts %}
+{% endblock %}
+
+</body>
+
+</html>

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block titre %}
+Câblage
+{% endblock %}
+
+{% block contenu %}
+
+<div class="panel">
+
+    <h2>
+        ESP8266
+    </h2>
+
+    <div class="info-line">
+        <span>DHT22 DATA</span>
+        <strong>D5</strong>
+    </div>
+
+    <div class="info-line">
+        <span>HC-SR04 TRIG</span>
+        <strong>D1</strong>
+    </div>
+
+    <div class="info-line">
+        <span>HC-SR04 ECHO</span>
+        <strong>D2</strong>
+    </div>
+
+    <div class="info-line">
+        <span>DHT22 alimentation</span>
+        <strong>3V3 + GND</strong>
+    </div>
+
+    <div class="info-line">
+        <span>HC-SR04 alimentation</span>
+        <strong>3V3 + GND</strong>
+    </div>
+
+</div>
+
+{% endblock %}

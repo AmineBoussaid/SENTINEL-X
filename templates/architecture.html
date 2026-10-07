@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block titre %}
+Architecture du système
+{% endblock %}
+
+{% block contenu %}
+
+<div class="panel">
+
+    <h2>
+        Architecture SENTINEL-X
+    </h2>
+
+    <div class="info-line">
+        <span>Capteurs</span>
+        <strong>DHT22 + HC-SR04</strong>
+    </div>
+
+    <div class="info-line">
+        <span>Microcontrôleur</span>
+        <strong>ESP8266 NodeMCU</strong>
+    </div>
+
+    <div class="info-line">
+        <span>Serveur</span>
+        <strong>Python / Flask</strong>
+    </div>
+
+    <div class="info-line">
+        <span>Vision</span>
+        <strong>OpenCV / SFace</strong>
+    </div>
+
+    <div class="info-line">
+        <span>Interface</span>
+        <strong>SENTINEL-X Web Platform</strong>
+    </div>
+
+</div>
+
+{% endblock %}

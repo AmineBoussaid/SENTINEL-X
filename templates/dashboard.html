@@ -1,0 +1,604 @@
+{% extends "base.html" %}
+
+
+{% block titre %}
+Security & Data Center
+{% endblock %}
+
+
+{% block contenu %}
+
+
+<div class="dashboard-toolbar">
+
+    <div>
+
+        <div class="eyebrow">
+            SENTINEL-X LIVE ANALYTICS
+        </div>
+
+        <h2 class="dashboard-title">
+            Centre de supervision intelligent
+        </h2>
+
+    </div>
+
+
+    <select
+        id="periode"
+        class="period-select"
+    >
+
+        <option value="1">
+            Dernière heure
+        </option>
+
+        <option value="24" selected>
+            24 heures
+        </option>
+
+        <option value="168">
+            7 jours
+        </option>
+
+    </select>
+
+</div>
+
+
+<!-- ========================================= -->
+<!-- KPI -->
+<!-- ========================================= -->
+
+<div class="kpi-grid">
+
+
+    <article class="metric-card">
+
+        <div class="metric-header">
+
+            <span>
+                Température
+            </span>
+
+            <span class="metric-icon">
+                °C
+            </span>
+
+        </div>
+
+        <div
+            class="metric-value"
+            id="temperature"
+        >
+            --
+        </div>
+
+        <div class="metric-footer">
+
+            Moyenne :
+            <strong id="temp-moyenne">
+                --
+            </strong>
+
+        </div>
+
+    </article>
+
+
+
+    <article class="metric-card">
+
+        <div class="metric-header">
+
+            <span>
+                Humidité
+            </span>
+
+            <span class="metric-icon">
+                %
+            </span>
+
+        </div>
+
+        <div
+            class="metric-value"
+            id="humidite"
+        >
+            --
+        </div>
+
+        <div class="metric-footer">
+
+            Moyenne :
+            <strong id="hum-moyenne">
+                --
+            </strong>
+
+        </div>
+
+    </article>
+
+
+
+    <article class="metric-card threat-card">
+
+        <div class="metric-header">
+
+            <span>
+                Threat Score
+            </span>
+
+            <span>
+                IA
+            </span>
+
+        </div>
+
+        <div
+            class="metric-value"
+            id="risk-score"
+        >
+            0
+        </div>
+
+        <div
+            class="risk-level"
+            id="risk-level"
+        >
+            NORMAL
+        </div>
+
+    </article>
+
+
+
+    <article class="metric-card">
+
+        <div class="metric-header">
+
+            <span>
+                Reconnaissance
+            </span>
+
+            <span>
+                AI
+            </span>
+
+        </div>
+
+        <div
+            class="metric-value metric-person"
+            id="personne"
+        >
+            En attente
+        </div>
+
+        <div
+            id="autorisation"
+            class="status-neutral"
+        >
+            Identification
+        </div>
+
+    </article>
+
+
+</div>
+
+
+<!-- ========================================= -->
+<!-- STATUS -->
+<!-- ========================================= -->
+
+<div class="security-strip">
+
+    <div>
+
+        <span class="live-dot"></span>
+
+        <strong id="security-status">
+            INITIALISATION
+        </strong>
+
+    </div>
+
+
+    <div class="security-details">
+
+        <span>
+            Mouvement :
+            <strong id="motion-status">
+                --
+            </strong>
+        </span>
+
+        <span>
+            IA :
+            <strong id="face-status">
+                --
+            </strong>
+        </span>
+
+        <span>
+            Heure :
+            <strong id="heure">
+                --
+            </strong>
+        </span>
+
+    </div>
+
+</div>
+
+
+<!-- ========================================= -->
+<!-- GRAPHIQUE PRINCIPAL -->
+<!-- ========================================= -->
+
+<div class="analytics-layout">
+
+
+    <section class="data-panel chart-large">
+
+        <div class="panel-heading">
+
+            <div>
+
+                <span class="panel-kicker">
+                    TIME SERIES
+                </span>
+
+                <h3>
+                    Température & humidité
+                </h3>
+
+            </div>
+
+        </div>
+
+
+        <div class="chart-wrapper">
+
+            <canvas
+                id="environmentChart"
+            ></canvas>
+
+        </div>
+
+    </section>
+
+
+
+    <section class="data-panel">
+
+        <span class="panel-kicker">
+            RISK ENGINE
+        </span>
+
+        <h3>
+            Niveau de menace
+        </h3>
+
+
+        <div class="risk-circle">
+
+            <div>
+
+                <strong id="risk-circle-value">
+                    0
+                </strong>
+
+                <span>
+                    / 100
+                </span>
+
+            </div>
+
+        </div>
+
+
+        <div
+            id="risk-reasons"
+            class="risk-reasons"
+        >
+
+            Aucun facteur de risque
+
+        </div>
+
+    </section>
+
+
+</div>
+
+
+<!-- ========================================= -->
+<!-- DATA SCIENCE -->
+<!-- ========================================= -->
+
+<div class="analytics-layout">
+
+
+    <section class="data-panel">
+
+        <span class="panel-kicker">
+            EVENT ANALYTICS
+        </span>
+
+        <h3>
+            Répartition des événements
+        </h3>
+
+
+        <div class="chart-wrapper small-chart">
+
+            <canvas
+                id="eventsChart"
+            ></canvas>
+
+        </div>
+
+    </section>
+
+
+
+    <section class="data-panel">
+
+        <span class="panel-kicker">
+            DATA SCIENCE
+        </span>
+
+        <h3>
+            Température × Humidité
+        </h3>
+
+
+        <div class="chart-wrapper small-chart">
+
+            <canvas
+                id="correlationChart"
+            ></canvas>
+
+        </div>
+
+    </section>
+
+
+</div>
+
+
+<!-- ========================================= -->
+<!-- STATISTIQUES -->
+<!-- ========================================= -->
+
+<section class="data-panel">
+
+    <div class="panel-heading">
+
+        <div>
+
+            <span class="panel-kicker">
+                STATISTICAL SUMMARY
+            </span>
+
+            <h3>
+                Analyse statistique
+            </h3>
+
+        </div>
+
+    </div>
+
+
+    <div class="stats-grid">
+
+
+        <div class="stat-box">
+
+            <span>
+                Température moyenne
+            </span>
+
+            <strong id="stat-temp-mean">
+                --
+            </strong>
+
+        </div>
+
+
+        <div class="stat-box">
+
+            <span>
+                Écart-type température
+            </span>
+
+            <strong id="stat-temp-std">
+                --
+            </strong>
+
+        </div>
+
+
+        <div class="stat-box">
+
+            <span>
+                Humidité moyenne
+            </span>
+
+            <strong id="stat-hum-mean">
+                --
+            </strong>
+
+        </div>
+
+
+        <div class="stat-box">
+
+            <span>
+                Écart-type humidité
+            </span>
+
+            <strong id="stat-hum-std">
+                --
+            </strong>
+
+        </div>
+
+
+        <div class="stat-box">
+
+            <span>
+                Corrélation T° / H
+            </span>
+
+            <strong id="stat-correlation">
+                --
+            </strong>
+
+        </div>
+
+
+        <div class="stat-box">
+
+            <span>
+                Taux reconnaissance
+            </span>
+
+            <strong id="stat-recognition">
+                --
+            </strong>
+
+        </div>
+
+
+        <div class="stat-box">
+
+            <span>
+                Mouvements détectés
+            </span>
+
+            <strong id="stat-movements">
+                0
+            </strong>
+
+        </div>
+
+
+        <div class="stat-box">
+
+            <span>
+                Alertes
+            </span>
+
+            <strong id="stat-alerts">
+                0
+            </strong>
+
+        </div>
+
+
+    </div>
+
+</section>
+
+
+<!-- ========================================= -->
+<!-- CONTROLE -->
+<!-- ========================================= -->
+
+<section class="data-panel control-panel">
+
+    <div>
+
+        <span class="panel-kicker">
+            SECURITY CONTROL
+        </span>
+
+        <h3>
+            Contrôle de la sirène
+        </h3>
+
+        <p>
+            La désactivation coupe uniquement le son.
+            La détection et l'enregistrement restent actifs.
+        </p>
+
+    </div>
+
+
+    <div class="control-actions">
+
+        <button
+            id="alarm-toggle"
+            class="control-button active"
+        >
+
+            🔊 SIRÈNE ACTIVE
+
+        </button>
+
+
+        <button
+            id="alarm-test"
+            class="control-button secondary"
+        >
+
+            TESTER LA SIRÈNE
+
+        </button>
+
+    </div>
+
+</section>
+
+
+<!-- ========================================= -->
+<!-- EVENEMENT -->
+<!-- ========================================= -->
+
+<section class="data-panel event-panel">
+
+    <span class="panel-kicker">
+        LIVE EVENT
+    </span>
+
+    <h3>
+        Dernier événement
+    </h3>
+
+
+    <div class="latest-event">
+
+        <span class="event-pulse"></span>
+
+
+        <div>
+
+            <strong id="event-text">
+                Initialisation SENTINEL-X
+            </strong>
+
+            <p>
+                Temps réel
+            </p>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+{% endblock %}
+
+
+{% block scripts %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script
+    src="{{ url_for('static', filename='js/dashboard.js') }}"
+></script>
+
+{% endblock %}

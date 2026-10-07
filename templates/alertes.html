@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+
+
+{% block titre %}
+Historique & Alertes
+{% endblock %}
+
+
+{% block contenu %}
+
+
+<div class="panel">
+
+    <h2>
+        Historique des événements
+    </h2>
+
+    <p>
+        Reconnaissance faciale, mouvements,
+        alarmes et événements système.
+    </p>
+
+
+    <div class="table-container">
+
+        <table>
+
+            <thead>
+
+                <tr>
+
+                    <th>
+                        Date / heure
+                    </th>
+
+                    <th>
+                        Type
+                    </th>
+
+                    <th>
+                        Niveau
+                    </th>
+
+                    <th>
+                        Valeur
+                    </th>
+
+                    <th>
+                        Détails
+                    </th>
+
+                </tr>
+
+            </thead>
+
+
+            <tbody>
+
+                {% for event in evenements %}
+
+                <tr>
+
+                    <td>
+                        {{ event.date_heure }}
+                    </td>
+
+
+                    <td>
+                        {{ event.type }}
+                    </td>
+
+
+                    <td>
+
+                        {% if event.niveau == "CRITIQUE" %}
+
+                            <span class="badge-critique">
+                                CRITIQUE
+                            </span>
+
+                        {% elif event.niveau == "ALERTE" %}
+
+                            <span class="badge-alerte">
+                                ALERTE
+                            </span>
+
+                        {% elif event.niveau == "ATTENTION" %}
+
+                            <span class="badge-attention">
+                                ATTENTION
+                            </span>
+
+                        {% else %}
+
+                            <span class="badge-info">
+                                INFO
+                            </span>
+
+                        {% endif %}
+
+                    </td>
+
+
+                    <td>
+
+                        {{ event.valeur or "-" }}
+
+                    </td>
+
+
+                    <td>
+
+                        {{ event.details or "-" }}
+
+                    </td>
+
+                </tr>
+
+
+                {% else %}
+
+
+                <tr>
+
+                    <td colspan="5">
+
+                        Aucun événement enregistré.
+
+                    </td>
+
+                </tr>
+
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+
+
+<div
+    class="panel"
+    style="margin-top: 25px;"
+>
+
+    <h2>
+        Température & Humidité
+    </h2>
+
+    <p>
+        Mesures enregistrées automatiquement
+        toutes les 10 secondes.
+    </p>
+
+
+    <div class="table-container">
+
+        <table>
+
+            <thead>
+
+                <tr>
+
+                    <th>
+                        Date / heure
+                    </th>
+
+                    <th>
+                        Température
+                    </th>
+
+                    <th>
+                        Humidité
+                    </th>
+
+                </tr>
+
+            </thead>
+
+
+            <tbody>
+
+                {% for mesure in mesures %}
+
+                <tr>
+
+                    <td>
+                        {{ mesure.date_heure }}
+                    </td>
+
+
+                    <td>
+                        {{ mesure.temperature }} °C
+                    </td>
+
+
+                    <td>
+                        {{ mesure.humidite }} %
+                    </td>
+
+                </tr>
+
+
+                {% else %}
+
+
+                <tr>
+
+                    <td colspan="3">
+
+                        Aucune mesure enregistrée.
+
+                    </td>
+
+                </tr>
+
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+
+{% endblock %}
