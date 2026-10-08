@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+
+{% block titre %}
+Gestion des utilisateurs
+{% endblock %}
+
+
+{% block contenu %}
+
+{% with messages =
+    get_flashed_messages(
+        with_categories=true
+    )
+%}
+    {% for category, message in messages %}
+        <div class="admin-flash {{ category }}">
+            {{ message }}
+        </div>
+    {% endfor %}
+{% endwith %}
+
+
+<div class="user-admin-layout">
+
+    <section class="data-panel">
+        <span class="panel-kicker">
+            ADMINISTRATION
+        </span>
+
+        <h3>
+            Créer un utilisateur
+        </h3>
+
+        <p class="form-help">
+            Les informations du compte sont enregistrées
+            dans SQLite. Les photos sont optionnelles et
+            sont placées dans
+            <code>visages_connus/Prenom_Nom</code>.
+        </p>
+
+        <form
+            method="POST"
+            enctype="multipart/form-data"
+            class="user-form"
+        >
+            {{ form.hidden_tag() }}
+
+            <div class="form-grid">
+                <div>
+                    {{ form.first_name.label }}
+                    {{ form.first_name(
+                        autocomplete="given-name"
+                    ) }}
+                    {% for error in form.first_name.errors %}
+                        <small class="field-error">
+                            {{ error }}
+                        </small>
+                    {% endfor %}
+                </div>
+
+                <div>
+                    {{ form.last_name.label }}
+                    {{ form.last_name(
+                        autocomplete="family-name"
+                    ) }}
+                    {% for error in form.last_name.errors %}
+                        <small class="field-error">
+                            {{ error }}
+                        </small>
+                    {% endfor %}
+                </div>
+
+                <div>
+                    {{ form.role.label }}
+                    {{ form.role() }}
+                </div>
+
+                <div>
+                    {{ form.username.label }}
+                    {{ form.username(
+                        autocomplete="off"
+                    ) }}
+                    {% for error in form.username.errors %}
+                        <small class="field-error">
+                            {{ error }}
+                        </small>
+                    {% endfor %}
+                </div>
+
+                <div class="form-full">
+                    {{ form.password.label }}
+                    {{ form.password(
+                        autocomplete="new-password"
+                    ) }}
+                    {% for error in form.password.errors %}
+                        <small class="field-error">
+                            {{ error }}
+                        </small>
+                    {% endfor %}
+                    <small>
+                        Minimum 10 caractères.
+                    </small>
+                </div>
+
+                <div class="form-full">
+                    {{ form.photos.label }}
+                    {{ form.photos(
+                        accept=".jpg,.jpeg,.png,.bmp",
+                        multiple=true
+                    ) }}
+                    <small>
+                        Facultatif. Une ou plusieurs images,
+                        5 Mo maximum par image, avec un seul
+                        visage visible.
+                    </small>
+                </div>
+            </div>
+
+            {{ form.submit(
+                class="control-button active"
+            ) }}
+        </form>
+    </section>
+
+
+    <section class="data-panel">
+        <span class="panel-kicker">
+            COMPTES
+        </span>
+
+        <h3>
+            Utilisateurs existants
+        </h3>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nom complet</th>
+                        <th>Login</th>
+                        <th>Rôle</th>
+                        <th>Visage</th>
+                        <th>État</th>
+                        <th>Dernière connexion</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for user in utilisateurs %}
+                        <tr>
+                            <td>
+                                {{
+                                    (
+                                        (user.first_name or "")
+                                        ~ " "
+                                        ~ (user.last_name or "")
+                                    ).strip()
+                                    or "-"
+                                }}
+                            </td>
+                            <td>{{ user.username }}</td>
+                            <td>{{ user.role }}</td>
+                            <td>
+                                {% if user.face_folder %}
+                                    <span class="face-enabled">
+                                        {{ user.face_folder }}
+                                    </span>
+                                {% else %}
+                                    Mot de passe uniquement
+                                {% endif %}
+                            </td>
+                            <td>
+                                {{
+                                    "Actif"
+                                    if user.is_active
+                                    else "Désactivé"
+                                }}
+                            </td>
+                            <td>
+                                {{ user.last_login or "Jamais" }}
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="6">
+                                Aucun utilisateur.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+</div>
+
+{% endblock %}

@@ -77,9 +77,18 @@
             </a>
 
 
-            <a href="/security">
-                🛡 Security Center
-            </a>
+            {% if current_user.role == "ADMIN" %}
+
+                <a href="{{ url_for('admin_users') }}">
+                    Utilisateurs
+                </a>
+
+
+                <a href="/security">
+                    🛡 Security Center
+                </a>
+
+            {% endif %}
 
 
             <a href="/architecture">
@@ -110,7 +119,7 @@
                     "
                 >
 
-                    ● ADMIN
+                    ● {{ current_user.role }}
                     {{ current_user.username }}
 
                 </div>
@@ -187,7 +196,7 @@
 
                 <span class="dot"></span>
 
-                ADMIN AUTHENTIFIÉ
+                {{ current_user.role }} AUTHENTIFIÉ
 
             </div>
 

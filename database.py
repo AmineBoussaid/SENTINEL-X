@@ -130,6 +130,35 @@ def initialiser_db():
         )
 
 
+        # Migration douce pour les bases déjà créées.
+        colonnes_users = {
+            ligne["name"]
+            for ligne in conn.execute(
+                "PRAGMA table_info(users)"
+            ).fetchall()
+        }
+
+
+        nouvelles_colonnes = {
+            "first_name": "TEXT",
+            "last_name": "TEXT",
+            "face_folder": "TEXT"
+        }
+
+
+        for nom_colonne, definition in (
+            nouvelles_colonnes.items()
+        ):
+
+            if nom_colonne not in colonnes_users:
+
+                conn.execute(
+                    f"ALTER TABLE users "
+                    f"ADD COLUMN {nom_colonne} "
+                    f"{definition}"
+                )
+
+
         # ==============================================
         # AUDIT CYBERSECURITE
         # ==============================================
@@ -391,7 +420,103 @@ def lire_evenements_depuis(
 
 
 # ==========================================================
-# ADMIN
+# GESTION DES UTILISATEURS
+# ==========================================================
+
+def creer_utilisateur(
+    first_name,
+    last_name,
+    username,
+    password_hash,
+    role,
+    face_folder
+):
+
+    role = role.upper()
+
+
+    if role not in (
+        "ADMIN",
+        "USER"
+    ):
+
+        raise ValueError(
+            "Role utilisateur invalide"
+        )
+
+
+    with connexion() as conn:
+
+        curseur = conn.execute(
+            """
+            INSERT INTO users (
+                first_name,
+                last_name,
+                username,
+                password_hash,
+                role,
+                face_folder,
+                is_active,
+                failed_attempts,
+                created_at
+            )
+
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                first_name,
+                last_name,
+                username,
+                password_hash,
+                role,
+                face_folder,
+                1,
+                0,
+                maintenant()
+            )
+        )
+
+
+        conn.commit()
+
+
+        return curseur.lastrowid
+
+
+def lire_utilisateurs():
+
+    with connexion() as conn:
+
+        lignes = conn.execute(
+            """
+            SELECT
+                id,
+                first_name,
+                last_name,
+                username,
+                role,
+                face_folder,
+                is_active,
+                failed_attempts,
+                locked_until,
+                last_login,
+                created_at
+
+            FROM users
+
+            ORDER BY id DESC
+            """
+        ).fetchall()
+
+
+    return [
+        dict(ligne)
+        for ligne in lignes
+    ]
+
+
+# ==========================================================
+# ADMIN HISTORIQUE
 # ==========================================================
 
 def creer_admin(

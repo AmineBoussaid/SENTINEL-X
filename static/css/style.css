@@ -1353,3 +1353,108 @@ body {
     }
 
 }
+
+
+/* =========================================================
+   GESTION DES UTILISATEURS
+========================================================= */
+
+.user-admin-layout {
+    display: grid;
+    gap: 22px;
+}
+
+.form-help {
+    max-width: 760px;
+    color: #8392a8;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.form-help code {
+    color: #77a7ff;
+}
+
+.user-form {
+    margin-top: 24px;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+    margin-bottom: 22px;
+}
+
+.form-grid .form-full {
+    grid-column: 1 / -1;
+}
+
+.user-form label {
+    display: block;
+    margin-bottom: 7px;
+    color: #aab7c9;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.user-form input[type="text"],
+.user-form input[type="password"],
+.user-form input[type="file"],
+.user-form select {
+    width: 100%;
+    padding: 12px 13px;
+    color: #eef4fb;
+    background: #0a121d;
+    border: 1px solid #29384d;
+    border-radius: 8px;
+}
+
+.user-form input:focus,
+.user-form select:focus {
+    border-color: #4d8dff;
+    outline: none;
+}
+
+.user-form small {
+    display: block;
+    margin-top: 6px;
+    color: #74849b;
+    font-size: 11px;
+}
+
+.user-form .field-error {
+    color: #ff7881;
+}
+
+.admin-flash {
+    margin-bottom: 18px;
+    padding: 12px 14px;
+    border-radius: 8px;
+}
+
+.admin-flash.info {
+    color: #73b0ff;
+    background: #10233b;
+    border: 1px solid #224875;
+}
+
+.admin-flash.danger {
+    color: #ff7b83;
+    background: #37161b;
+    border: 1px solid #65262e;
+}
+
+.face-enabled {
+    color: #51dda0;
+}
+
+@media (max-width: 760px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .form-grid .form-full {
+        grid-column: auto;
+    }
+}

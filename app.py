@@ -1,11 +1,15 @@
 import os
 import math
 import statistics
+import sqlite3
+import time
 
 from datetime import (
     datetime,
     timedelta
 )
+
+from functools import wraps
 
 
 from flask import (
@@ -49,18 +53,22 @@ from flask_limiter.util import (
 from wtforms import (
     StringField,
     PasswordField,
+    SelectField,
+    MultipleFileField,
     SubmitField
 )
 
 
 from wtforms.validators import (
     DataRequired,
-    Length
+    Length,
+    Regexp
 )
 
 
 from werkzeug.security import (
-    check_password_hash
+    check_password_hash,
+    generate_password_hash
 )
 
 
@@ -89,7 +97,18 @@ from database import (
     enregistrer_echec_connexion,
     enregistrer_succes_connexion,
     ajouter_audit,
-    lire_audits
+    lire_audits,
+    creer_utilisateur,
+    lire_utilisateurs
+)
+
+
+from face_auth import (
+    FaceAuthError,
+    profile_exists,
+    remove_profile_folder,
+    save_profile_images,
+    verify_face
 )
 
 
@@ -212,6 +231,16 @@ class AdminUser(
             data["role"]
         )
 
+        self.first_name = (
+            data.get("first_name")
+            or ""
+        )
+
+        self.last_name = (
+            data.get("last_name")
+            or ""
+        )
+
         self.active = bool(
             data["is_active"]
         )
@@ -223,6 +252,34 @@ class AdminUser(
     ):
 
         return self.active
+
+
+# ==========================================================
+# ADMIN REQUIRED
+# ==========================================================
+
+def admin_required(view):
+
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+
+        if (
+            not current_user.is_authenticated
+            or current_user.role != "ADMIN"
+        ):
+
+            flash(
+                "Accès réservé aux administrateurs.",
+                "danger"
+            )
+
+            return redirect(
+                url_for("dashboard")
+            )
+
+        return view(*args, **kwargs)
+
+    return wrapped
 
 
 # ==========================================================
@@ -283,8 +340,84 @@ class LoginForm(
     )
 
 
+    role = SelectField(
+        "Type de compte",
+        choices=[
+            ("ADMIN", "Administrateur"),
+            ("USER", "Utilisateur")
+        ],
+        validators=[
+            DataRequired()
+        ]
+    )
+
+
     submit = SubmitField(
         "SE CONNECTER"
+    )
+
+
+class UserCreationForm(
+    FlaskForm
+):
+
+    first_name = StringField(
+        "Prénom",
+        validators=[
+            DataRequired(),
+            Length(min=2, max=80)
+        ]
+    )
+
+    last_name = StringField(
+        "Nom",
+        validators=[
+            DataRequired(),
+            Length(min=2, max=80)
+        ]
+    )
+
+    role = SelectField(
+        "Type de compte",
+        choices=[
+            ("USER", "Utilisateur"),
+            ("ADMIN", "Administrateur")
+        ],
+        validators=[
+            DataRequired()
+        ]
+    )
+
+    username = StringField(
+        "Login",
+        validators=[
+            DataRequired(),
+            Length(min=3, max=50),
+            Regexp(
+                r"^[A-Za-z0-9_.-]+$",
+                message=(
+                    "Le login peut contenir uniquement "
+                    "des lettres, chiffres, points, "
+                    "tirets et underscores."
+                )
+            )
+        ]
+    )
+
+    password = PasswordField(
+        "Mot de passe",
+        validators=[
+            DataRequired(),
+            Length(min=10, max=200)
+        ]
+    )
+
+    photos = MultipleFileField(
+        "Photos du visage (optionnelles)"
+    )
+
+    submit = SubmitField(
+        "CRÉER L'UTILISATEUR"
     )
 
 
@@ -328,6 +461,11 @@ def login():
             form.password.data
         )
 
+        selected_role = (
+            form.role.data
+            .upper()
+        )
+
 
         ip = (
             request.remote_addr
@@ -353,6 +491,36 @@ def login():
                 "ECHEC",
                 ip,
                 "Utilisateur inconnu"
+            )
+
+
+            flash(
+                "Identifiants incorrects.",
+                "danger"
+            )
+
+
+            return render_template(
+                "login.html",
+                form=form
+            )
+
+
+        # ==============================================
+        # TYPE DE COMPTE
+        # ==============================================
+
+        if (
+            utilisateur["role"].upper()
+            != selected_role
+        ):
+
+            ajouter_audit(
+                username,
+                "LOGIN_FAILED",
+                "ECHEC",
+                ip,
+                "Type de compte incorrect"
             )
 
 
@@ -444,17 +612,54 @@ def login():
             password
         ):
 
+            if profile_exists(
+                utilisateur.get(
+                    "face_folder"
+                )
+            ):
+
+                session[
+                    "pending_face_user_id"
+                ] = utilisateur["id"]
+
+                session[
+                    "pending_face_started"
+                ] = int(time.time())
+
+                session[
+                    "pending_face_failures"
+                ] = 0
+
+                session[
+                    "pending_face_matches"
+                ] = 0
+
+
+                ajouter_audit(
+                    username,
+                    "PASSWORD_SUCCESS",
+                    "EN_ATTENTE",
+                    ip,
+                    "Vérification faciale requise"
+                )
+
+
+                return redirect(
+                    url_for(
+                        "face_verification"
+                    )
+                )
+
+
+            # Compatibilité : un utilisateur sans image
+            # conserve le login classique.
             enregistrer_succes_connexion(
-                utilisateur[
-                    "id"
-                ]
+                utilisateur["id"]
             )
 
 
             login_user(
-                AdminUser(
-                    utilisateur
-                ),
+                AdminUser(utilisateur),
                 remember=False
             )
 
@@ -467,14 +672,15 @@ def login():
                 "LOGIN_SUCCESS",
                 "SUCCES",
                 ip,
-                "Connexion administrateur"
+                (
+                    "Connexion sans profil facial - "
+                    f"rôle {utilisateur['role']}"
+                )
             )
 
 
             return redirect(
-                url_for(
-                    "dashboard"
-                )
+                url_for("dashboard")
             )
 
 
@@ -539,6 +745,236 @@ def login():
         "login.html",
         form=form
     )
+
+
+# ==========================================================
+# VERIFICATION FACIALE DU LOGIN
+# ==========================================================
+
+def clear_pending_face():
+
+    for key in (
+        "pending_face_user_id",
+        "pending_face_started",
+        "pending_face_failures",
+        "pending_face_matches"
+    ):
+        session.pop(
+            key,
+            None
+        )
+
+
+def pending_face_user():
+
+    user_id = session.get(
+        "pending_face_user_id"
+    )
+    started = session.get(
+        "pending_face_started"
+    )
+
+    if not user_id or not started:
+        return None
+
+    if (
+        time.time()
+        - float(started)
+        > 120
+    ):
+        clear_pending_face()
+        return None
+
+    return utilisateur_par_id(
+        user_id
+    )
+
+
+@app.route(
+    "/verification-faciale"
+)
+def face_verification():
+
+    if current_user.is_authenticated:
+        return redirect(
+            url_for("dashboard")
+        )
+
+    utilisateur = pending_face_user()
+
+    if utilisateur is None:
+        flash(
+            "La vérification a expiré. Reconnectez-vous.",
+            "danger"
+        )
+        return redirect(
+            url_for("login")
+        )
+
+    if not profile_exists(
+        utilisateur.get("face_folder")
+    ):
+        clear_pending_face()
+        flash(
+            "Le profil facial est indisponible.",
+            "danger"
+        )
+        return redirect(
+            url_for("login")
+        )
+
+    return render_template(
+        "face_verification.html",
+        utilisateur=utilisateur
+    )
+
+
+@app.route(
+    "/api/auth/face/verify",
+    methods=["POST"]
+)
+@limiter.limit(
+    "30 per minute"
+)
+def face_verify_api():
+
+    utilisateur = pending_face_user()
+
+    if utilisateur is None:
+        return jsonify({
+            "success": False,
+            "expired": True,
+            "redirect": url_for("login"),
+            "message": "Session de vérification expirée."
+        }), 401
+
+    image = request.files.get(
+        "image"
+    )
+
+    if image is None:
+        return jsonify({
+            "success": False,
+            "retry": True,
+            "message": "Image absente."
+        }), 400
+
+    try:
+        matched, score = verify_face(
+            image.read(),
+            utilisateur["face_folder"]
+        )
+    except FaceAuthError as error:
+        return jsonify({
+            "success": False,
+            "retry": True,
+            "message": str(error)
+        })
+
+    if matched:
+        matches = (
+            int(
+                session.get(
+                    "pending_face_matches",
+                    0
+                )
+            )
+            + 1
+        )
+        session[
+            "pending_face_matches"
+        ] = matches
+
+        if matches < 2:
+            return jsonify({
+                "success": False,
+                "retry": True,
+                "matched": True,
+                "message": (
+                    "Visage reconnu. "
+                    "Confirmation en cours..."
+                )
+            })
+
+        enregistrer_succes_connexion(
+            utilisateur["id"]
+        )
+
+        clear_pending_face()
+
+        login_user(
+            AdminUser(utilisateur),
+            remember=False
+        )
+        session.permanent = True
+
+        ajouter_audit(
+            utilisateur["username"],
+            "FACE_LOGIN_SUCCESS",
+            "SUCCES",
+            request.remote_addr,
+            f"Visage vérifié - score {score}"
+        )
+
+        return jsonify({
+            "success": True,
+            "redirect": url_for("dashboard"),
+            "message": "Identité confirmée."
+        })
+
+    failures = (
+        int(
+            session.get(
+                "pending_face_failures",
+                0
+            )
+        )
+        + 1
+    )
+    session[
+        "pending_face_failures"
+    ] = failures
+    session[
+        "pending_face_matches"
+    ] = 0
+
+    tentatives, locked_until = (
+        enregistrer_echec_connexion(
+            utilisateur["id"]
+        )
+    )
+
+    ajouter_audit(
+        utilisateur["username"],
+        "FACE_LOGIN_FAILED",
+        "ECHEC",
+        request.remote_addr,
+        (
+            f"Visage différent - score {score} - "
+            f"échec {failures}/5"
+        )
+    )
+
+    if failures >= 5 or locked_until:
+        clear_pending_face()
+        return jsonify({
+            "success": False,
+            "blocked": True,
+            "redirect": url_for("login"),
+            "message": (
+                "Vérification refusée. "
+                "Le compte est temporairement verrouillé."
+            )
+        }), 403
+
+    return jsonify({
+        "success": False,
+        "retry": True,
+        "message": (
+            "Le visage ne correspond pas. "
+            f"Tentative {failures}/5."
+        )
+    })
 
 
 # ==========================================================
@@ -664,6 +1100,130 @@ def alertes():
 
 
 # ==========================================================
+# GESTION DES UTILISATEURS
+# ==========================================================
+
+@app.route(
+    "/admin/utilisateurs",
+    methods=[
+        "GET",
+        "POST"
+    ]
+)
+@login_required
+@admin_required
+def admin_users():
+
+    form = UserCreationForm()
+
+    if form.validate_on_submit():
+        username = (
+            form.username.data
+            .strip()
+            .lower()
+        )
+
+        if utilisateur_par_username(
+            username
+        ):
+            flash(
+                "Ce login existe déjà.",
+                "danger"
+            )
+        else:
+            face_folder = None
+
+            try:
+                face_folder, photo_count = (
+                    save_profile_images(
+                        form.photos.data or [],
+                        form.first_name.data.strip(),
+                        form.last_name.data.strip()
+                    )
+                )
+
+                creer_utilisateur(
+                    form.first_name.data.strip(),
+                    form.last_name.data.strip(),
+                    username,
+                    generate_password_hash(
+                        form.password.data,
+                        method="scrypt"
+                    ),
+                    form.role.data,
+                    face_folder
+                )
+
+                ajouter_audit(
+                    current_user.username,
+                    "USER_CREATED",
+                    "SUCCES",
+                    request.remote_addr,
+                    (
+                        f"Compte {username} - "
+                        f"rôle {form.role.data} - "
+                        f"{photo_count} photo(s)"
+                    )
+                )
+
+                flash(
+                    (
+                        f"Utilisateur {username} créé. "
+                        + (
+                            "La vérification faciale est active."
+                            if photo_count
+                            else
+                            "Connexion par mot de passe uniquement."
+                        )
+                    ),
+                    "info"
+                )
+
+                return redirect(
+                    url_for("admin_users")
+                )
+
+            except (
+                FaceAuthError,
+                ValueError
+            ) as error:
+                remove_profile_folder(
+                    face_folder
+                )
+                flash(
+                    str(error),
+                    "danger"
+                )
+
+            except sqlite3.IntegrityError:
+                remove_profile_folder(
+                    face_folder
+                )
+                flash(
+                    "Ce login existe déjà.",
+                    "danger"
+                )
+
+            except Exception:
+                remove_profile_folder(
+                    face_folder
+                )
+                app.logger.exception(
+                    "Création utilisateur impossible"
+                )
+                flash(
+                    "Impossible de créer l'utilisateur.",
+                    "danger"
+                )
+
+    return render_template(
+        "users.html",
+        form=form,
+        utilisateurs=lire_utilisateurs()
+    )
+
+
+# ==========================================================
 # SECURITY CENTER
 # ==========================================================
 
@@ -671,6 +1231,7 @@ def alertes():
     "/security"
 )
 @login_required
+@admin_required
 def security():
 
     audits = lire_audits(
@@ -1327,7 +1888,7 @@ def security_headers(
     response.headers[
         "Permissions-Policy"
     ] = (
-        "camera=(), "
+        "camera=(self), "
         "microphone=(), "
         "geolocation=()"
     )
