@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+
+<html lang="fr">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <title>
+        SENTINEL-X | Secure Access
+    </title>
+
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+
+        body {
+
+            margin: 0;
+
+            min-height: 100vh;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            font-family:
+                Arial,
+                Helvetica,
+                sans-serif;
+
+            color: #edf3fa;
+
+            background:
+                radial-gradient(
+                    circle at top right,
+                    #142743,
+                    #070b12 45%
+                );
+        }
+
+
+        .login-container {
+
+            width: 420px;
+
+            max-width:
+                calc(
+                    100% - 30px
+                );
+
+            background:
+                rgba(
+                    14,
+                    21,
+                    32,
+                    .96
+                );
+
+            border:
+                1px solid #233247;
+
+            border-radius:
+                18px;
+
+            padding:
+                38px;
+        }
+
+
+        .logo {
+
+            width: 58px;
+
+            height: 58px;
+
+            border-radius: 14px;
+
+            background: #2f75ff;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            font-weight: bold;
+
+            margin-bottom: 25px;
+        }
+
+
+        .eyebrow {
+
+            color: #558fff;
+
+            font-size: 10px;
+
+            letter-spacing: 2px;
+
+            font-weight: bold;
+        }
+
+
+        h1 {
+
+            font-size: 25px;
+
+            margin:
+                8px 0;
+        }
+
+
+        .subtitle {
+
+            color: #7d8ba0;
+
+            margin-bottom:
+                30px;
+
+            font-size: 13px;
+        }
+
+
+        label {
+
+            display: block;
+
+            color: #98a6ba;
+
+            font-size: 12px;
+
+            margin-bottom: 7px;
+        }
+
+
+        input[type="text"],
+        input[type="password"] {
+
+            width: 100%;
+
+            padding: 13px 14px;
+
+            margin-bottom: 18px;
+
+            border-radius: 8px;
+
+            border:
+                1px solid #29384d;
+
+            background: #09111b;
+
+            color: white;
+
+            font-size: 15px;
+
+            outline: none;
+        }
+
+
+        input:focus {
+
+            border-color:
+                #4d8dff;
+        }
+
+
+        input[type="submit"] {
+
+            width: 100%;
+
+            padding: 14px;
+
+            border: none;
+
+            border-radius: 8px;
+
+            cursor: pointer;
+
+            background: #3478f6;
+
+            color: white;
+
+            font-weight: bold;
+
+            letter-spacing: .5px;
+        }
+
+
+        .flash {
+
+            padding: 11px;
+
+            border-radius: 7px;
+
+            margin-bottom: 18px;
+
+            font-size: 13px;
+        }
+
+
+        .danger {
+
+            background: #37161b;
+
+            color: #ff737b;
+
+            border:
+                1px solid #65262e;
+        }
+
+
+        .info {
+
+            background: #10233b;
+
+            color: #70adff;
+        }
+
+
+        .security-info {
+
+            margin-top: 25px;
+
+            border-top:
+                1px solid #202e40;
+
+            padding-top: 18px;
+
+            color: #718097;
+
+            font-size: 11px;
+
+            line-height: 1.7;
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+<div class="login-container">
+
+    <div class="logo">
+        SX
+    </div>
+
+
+    <div class="eyebrow">
+        SENTINEL-X SECURITY
+    </div>
+
+
+    <h1>
+        Accès administrateur
+    </h1>
+
+
+    <div class="subtitle">
+
+        Centre de commandement sécurisé
+
+    </div>
+
+
+    {% with messages =
+        get_flashed_messages(
+            with_categories=true
+        )
+    %}
+
+        {% for category, message
+            in messages
+        %}
+
+            <div
+                class="flash {{ category }}"
+            >
+
+                {{ message }}
+
+            </div>
+
+        {% endfor %}
+
+    {% endwith %}
+
+
+    <form method="POST">
+
+        {{ form.hidden_tag() }}
+
+
+        {{ form.username.label }}
+
+        {{ form.username(
+            autocomplete="username"
+        ) }}
+
+
+        {{ form.password.label }}
+
+        {{ form.password(
+            autocomplete="current-password"
+        ) }}
+
+
+        {{ form.submit() }}
+
+    </form>
+
+
+    <div class="security-info">
+
+        🔒 Authentification obligatoire
+        <br>
+
+        🛡 Protection CSRF active
+        <br>
+
+        🚫 Limitation des tentatives
+        <br>
+
+        📋 Connexions journalisées
+
+    </div>
+
+</div>
+
+
+</body>
+
+</html>

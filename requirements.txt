@@ -1,0 +1,8 @@
+Flask>=3.0,<4.0
+Flask-Login
+Flask-WTF
+Flask-Limiter
+python-dotenv
+pyserial>=3.5,<4.0
+opencv-contrib-python==4.12.0.88
+numpy==2.2.6

@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+
+{% block titre %}
+Security Center
+{% endblock %}
+
+
+{% block contenu %}
+
+
+<div class="data-panel">
+
+    <span class="panel-kicker">
+        SECURITY POSTURE
+    </span>
+
+    <h3>
+        État de sécurité SENTINEL-X
+    </h3>
+
+
+    <div class="stats-grid">
+
+
+        <div class="stat-box">
+
+            <span>
+                Administrateur
+            </span>
+
+            <strong>
+                {{ current_user.username }}
+            </strong>
+
+        </div>
+
+
+        <div class="stat-box">
+
+            <span>
+                Rôle
+            </span>
+
+            <strong>
+                ADMIN
+            </strong>
+
+        </div>
+
+
+        <div class="stat-box">
+
+            <span>
+                Protection CSRF
+            </span>
+
+            <strong
+                style="color:#38d996;"
+            >
+                ACTIVE
+            </strong>
+
+        </div>
+
+
+        <div class="stat-box">
+
+            <span>
+                Rate limiting
+            </span>
+
+            <strong
+                style="color:#38d996;"
+            >
+                ACTIF
+            </strong>
+
+        </div>
+
+
+        <div class="stat-box">
+
+            <span>
+                Password hashing
+            </span>
+
+            <strong
+                style="color:#38d996;"
+            >
+                SCRYPT
+            </strong>
+
+        </div>
+
+
+        <div class="stat-box">
+
+            <span>
+                Session
+            </span>
+
+            <strong>
+                30 MIN
+            </strong>
+
+        </div>
+
+
+        <div class="stat-box">
+
+            <span>
+                Échecs avant blocage
+            </span>
+
+            <strong>
+                5
+            </strong>
+
+        </div>
+
+
+        <div class="stat-box">
+
+            <span>
+                Blocage
+            </span>
+
+            <strong>
+                5 MIN
+            </strong>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+<div class="data-panel">
+
+    <span class="panel-kicker">
+        SECURITY AUDIT
+    </span>
+
+    <h3>
+        Journal de sécurité
+    </h3>
+
+
+    <div class="table-container">
+
+        <table>
+
+
+            <thead>
+
+                <tr>
+
+                    <th>
+                        Date / heure
+                    </th>
+
+                    <th>
+                        Utilisateur
+                    </th>
+
+                    <th>
+                        Action
+                    </th>
+
+                    <th>
+                        Statut
+                    </th>
+
+                    <th>
+                        IP
+                    </th>
+
+                    <th>
+                        Détails
+                    </th>
+
+                </tr>
+
+            </thead>
+
+
+            <tbody>
+
+
+                {% for audit in audits %}
+
+                    <tr>
+
+                        <td>
+                            {{ audit.date_heure }}
+                        </td>
+
+                        <td>
+                            {{ audit.utilisateur or "-" }}
+                        </td>
+
+                        <td>
+                            {{ audit.action }}
+                        </td>
+
+                        <td>
+                            {{ audit.statut }}
+                        </td>
+
+                        <td>
+                            {{ audit.adresse_ip or "-" }}
+                        </td>
+
+                        <td>
+                            {{ audit.details or "-" }}
+                        </td>
+
+                    </tr>
+
+
+                {% else %}
+
+                    <tr>
+
+                        <td colspan="6">
+
+                            Aucun événement cyber.
+
+                        </td>
+
+                    </tr>
+
+                {% endfor %}
+
+
+            </tbody>
+
+
+        </table>
+
+    </div>
+
+</div>
+
+
+{% endblock %}

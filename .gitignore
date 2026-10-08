@@ -8,3 +8,9 @@ visages_connus/
 
 __pycache__/
 sentinel.db
+.env
+sentinel.db
+__pycache__/
+*.pyc
+visages_connus/
+.pio/

@@ -1,13 +1,72 @@
+import os
+import math
+import statistics
+
+from datetime import (
+    datetime,
+    timedelta
+)
+
+
 from flask import (
     Flask,
     render_template,
     jsonify,
-    request
+    request,
+    redirect,
+    url_for,
+    flash,
+    session
 )
 
-from datetime import datetime
-import math
-import statistics
+
+from flask_login import (
+    LoginManager,
+    UserMixin,
+    login_user,
+    logout_user,
+    login_required,
+    current_user
+)
+
+
+from flask_wtf import (
+    FlaskForm,
+    CSRFProtect
+)
+
+
+from flask_limiter import (
+    Limiter
+)
+
+
+from flask_limiter.util import (
+    get_remote_address
+)
+
+
+from wtforms import (
+    StringField,
+    PasswordField,
+    SubmitField
+)
+
+
+from wtforms.validators import (
+    DataRequired,
+    Length
+)
+
+
+from werkzeug.security import (
+    check_password_hash
+)
+
+
+from dotenv import (
+    load_dotenv
+)
 
 
 from sentinel_engine import (
@@ -23,29 +82,634 @@ from database import (
     lire_evenements,
     lire_mesures,
     lire_mesures_depuis,
-    lire_evenements_depuis
+    lire_evenements_depuis,
+    utilisateur_par_username,
+    utilisateur_par_id,
+    utilisateur_verrouille,
+    enregistrer_echec_connexion,
+    enregistrer_succes_connexion,
+    ajouter_audit,
+    lire_audits
 )
 
+
+# ==========================================================
+# ENVIRONNEMENT
+# ==========================================================
+
+load_dotenv()
+
+
+SECRET_KEY = os.getenv(
+    "SECRET_KEY"
+)
+
+
+if not SECRET_KEY:
+
+    raise RuntimeError(
+        "SECRET_KEY absente du fichier .env"
+    )
+
+
+# ==========================================================
+# FLASK
+# ==========================================================
 
 app = Flask(
     __name__
 )
 
 
+app.config.update(
+
+    SECRET_KEY=SECRET_KEY,
+
+    SESSION_COOKIE_HTTPONLY=True,
+
+    SESSION_COOKIE_SAMESITE="Lax",
+
+    SESSION_COOKIE_SECURE=(
+        os.getenv(
+            "SESSION_COOKIE_SECURE",
+            "0"
+        )
+        == "1"
+    ),
+
+    PERMANENT_SESSION_LIFETIME=
+        timedelta(
+            minutes=30
+        )
+)
+
+
 # ==========================================================
-# RISQUE SENTINEL-X
+# CSRF
 # ==========================================================
 
-def calculer_risque(etat):
+csrf = CSRFProtect(
+    app
+)
+
+
+# ==========================================================
+# RATE LIMITING
+# ==========================================================
+
+limiter = Limiter(
+    key_func=get_remote_address,
+    app=app,
+    default_limits=[]
+)
+
+
+# ==========================================================
+# LOGIN MANAGER
+# ==========================================================
+
+login_manager = LoginManager()
+
+login_manager.init_app(
+    app
+)
+
+login_manager.login_view = (
+    "login"
+)
+
+login_manager.login_message = (
+    "Veuillez vous connecter."
+)
+
+login_manager.login_message_category = (
+    "warning"
+)
+
+
+# ==========================================================
+# USER CLASS
+# ==========================================================
+
+class AdminUser(
+    UserMixin
+):
+
+    def __init__(
+        self,
+        data
+    ):
+
+        self.id = str(
+            data["id"]
+        )
+
+        self.username = (
+            data["username"]
+        )
+
+        self.role = (
+            data["role"]
+        )
+
+        self.active = bool(
+            data["is_active"]
+        )
+
+
+    @property
+    def is_active(
+        self
+    ):
+
+        return self.active
+
+
+# ==========================================================
+# LOAD USER
+# ==========================================================
+
+@login_manager.user_loader
+def load_user(
+    user_id
+):
+
+    utilisateur = (
+        utilisateur_par_id(
+            user_id
+        )
+    )
+
+
+    if utilisateur is None:
+
+        return None
+
+
+    return AdminUser(
+        utilisateur
+    )
+
+
+# ==========================================================
+# FORM LOGIN
+# ==========================================================
+
+class LoginForm(
+    FlaskForm
+):
+
+    username = StringField(
+        "Utilisateur",
+        validators=[
+            DataRequired(),
+            Length(
+                min=3,
+                max=50
+            )
+        ]
+    )
+
+
+    password = PasswordField(
+        "Mot de passe",
+        validators=[
+            DataRequired(),
+            Length(
+                min=1,
+                max=200
+            )
+        ]
+    )
+
+
+    submit = SubmitField(
+        "SE CONNECTER"
+    )
+
+
+# ==========================================================
+# LOGIN
+# ==========================================================
+
+@app.route(
+    "/login",
+    methods=[
+        "GET",
+        "POST"
+    ]
+)
+@limiter.limit(
+    "5 per minute"
+)
+def login():
+
+    if current_user.is_authenticated:
+
+        return redirect(
+            url_for(
+                "dashboard"
+            )
+        )
+
+
+    form = LoginForm()
+
+
+    if form.validate_on_submit():
+
+        username = (
+            form.username.data
+            .strip()
+        )
+
+
+        password = (
+            form.password.data
+        )
+
+
+        ip = (
+            request.remote_addr
+        )
+
+
+        utilisateur = (
+            utilisateur_par_username(
+                username
+            )
+        )
+
+
+        # ==============================================
+        # UTILISATEUR INCONNU
+        # ==============================================
+
+        if utilisateur is None:
+
+            ajouter_audit(
+                username,
+                "LOGIN_FAILED",
+                "ECHEC",
+                ip,
+                "Utilisateur inconnu"
+            )
+
+
+            flash(
+                "Identifiants incorrects.",
+                "danger"
+            )
+
+
+            return render_template(
+                "login.html",
+                form=form
+            )
+
+
+        # ==============================================
+        # COMPTE DESACTIVE
+        # ==============================================
+
+        if not utilisateur[
+            "is_active"
+        ]:
+
+            ajouter_audit(
+                username,
+                "LOGIN_FAILED",
+                "ECHEC",
+                ip,
+                "Compte desactive"
+            )
+
+
+            flash(
+                "Compte desactive.",
+                "danger"
+            )
+
+
+            return render_template(
+                "login.html",
+                form=form
+            )
+
+
+        # ==============================================
+        # VERROUILLAGE
+        # ==============================================
+
+        if utilisateur_verrouille(
+            utilisateur
+        ):
+
+            ajouter_audit(
+                username,
+                "LOGIN_BLOCKED",
+                "BLOQUE",
+                ip,
+                (
+                    "Compte temporairement "
+                    "verrouille"
+                )
+            )
+
+
+            flash(
+                (
+                    "Compte temporairement "
+                    "verrouille. Reessayez "
+                    "dans quelques minutes."
+                ),
+                "danger"
+            )
+
+
+            return render_template(
+                "login.html",
+                form=form
+            )
+
+
+        # ==============================================
+        # MOT DE PASSE CORRECT
+        # ==============================================
+
+        if check_password_hash(
+            utilisateur[
+                "password_hash"
+            ],
+            password
+        ):
+
+            enregistrer_succes_connexion(
+                utilisateur[
+                    "id"
+                ]
+            )
+
+
+            login_user(
+                AdminUser(
+                    utilisateur
+                ),
+                remember=False
+            )
+
+
+            session.permanent = True
+
+
+            ajouter_audit(
+                username,
+                "LOGIN_SUCCESS",
+                "SUCCES",
+                ip,
+                "Connexion administrateur"
+            )
+
+
+            return redirect(
+                url_for(
+                    "dashboard"
+                )
+            )
+
+
+        # ==============================================
+        # MOT DE PASSE INCORRECT
+        # ==============================================
+
+        tentatives, locked_until = (
+            enregistrer_echec_connexion(
+                utilisateur[
+                    "id"
+                ]
+            )
+        )
+
+
+        details = (
+            f"Echec {tentatives}/5"
+        )
+
+
+        if locked_until:
+
+            details += (
+                " - verrouillage jusqu'a "
+                + locked_until
+            )
+
+
+        ajouter_audit(
+            username,
+            "LOGIN_FAILED",
+            "ECHEC",
+            ip,
+            details
+        )
+
+
+        if locked_until:
+
+            flash(
+                (
+                    "Trop de tentatives. "
+                    "Compte verrouille "
+                    "pendant 5 minutes."
+                ),
+                "danger"
+            )
+
+        else:
+
+            flash(
+                (
+                    "Identifiants incorrects. "
+                    f"Tentative {tentatives}/5."
+                ),
+                "danger"
+            )
+
+
+    return render_template(
+        "login.html",
+        form=form
+    )
+
+
+# ==========================================================
+# LOGOUT
+# ==========================================================
+
+@app.route(
+    "/logout",
+    methods=[
+        "POST"
+    ]
+)
+@login_required
+def logout():
+
+    ajouter_audit(
+        current_user.username,
+        "LOGOUT",
+        "SUCCES",
+        request.remote_addr,
+        "Deconnexion administrateur"
+    )
+
+
+    logout_user()
+
+
+    flash(
+        "Vous etes deconnecte.",
+        "info"
+    )
+
+
+    return redirect(
+        url_for(
+            "login"
+        )
+    )
+
+
+# ==========================================================
+# DASHBOARD
+# ==========================================================
+
+@app.route("/")
+@login_required
+def dashboard():
+
+    return render_template(
+        "dashboard.html"
+    )
+
+
+# ==========================================================
+# ARCHITECTURE
+# ==========================================================
+
+@app.route(
+    "/architecture"
+)
+@login_required
+def architecture():
+
+    return render_template(
+        "architecture.html"
+    )
+
+
+# ==========================================================
+# CABLAGE
+# ==========================================================
+
+@app.route(
+    "/cablage"
+)
+@login_required
+def cablage():
+
+    return render_template(
+        "cablage.html"
+    )
+
+
+# ==========================================================
+# PARAMETRES
+# ==========================================================
+
+@app.route(
+    "/parametres"
+)
+@login_required
+def parametres():
+
+    return render_template(
+        "parametres.html"
+    )
+
+
+# ==========================================================
+# ALERTES
+# ==========================================================
+
+@app.route(
+    "/alertes"
+)
+@login_required
+def alertes():
+
+    return render_template(
+
+        "alertes.html",
+
+        evenements=
+            lire_evenements(
+                200
+            ),
+
+        mesures=
+            lire_mesures(
+                100
+            )
+    )
+
+
+# ==========================================================
+# SECURITY CENTER
+# ==========================================================
+
+@app.route(
+    "/security"
+)
+@login_required
+def security():
+
+    audits = lire_audits(
+        200
+    )
+
+
+    utilisateur = (
+        utilisateur_par_id(
+            current_user.id
+        )
+    )
+
+
+    return render_template(
+        "security.html",
+        audits=audits,
+        utilisateur=utilisateur
+    )
+
+
+# ==========================================================
+# CALCUL RISQUE
+# ==========================================================
+
+def calculer_risque(
+    etat
+):
 
     score = 0
-
     raisons = []
 
 
-    if etat.get(
-        "autorisee"
-    ) is False:
+    if (
+        etat.get(
+            "autorisee"
+        )
+        is False
+    ):
 
         score += 35
 
@@ -67,7 +731,7 @@ def calculer_risque(etat):
         score += 30
 
         raisons.append(
-            "Mouvement détecté"
+            "Mouvement detecte"
         )
 
 
@@ -76,17 +740,14 @@ def calculer_risque(etat):
     )
 
 
-    if (
-        temperature
-        is not None
-    ):
+    if temperature is not None:
 
         if temperature > 40:
 
             score += 20
 
             raisons.append(
-                "Température critique"
+                "Temperature critique"
             )
 
         elif temperature > 35:
@@ -94,7 +755,7 @@ def calculer_risque(etat):
             score += 8
 
             raisons.append(
-                "Température élevée"
+                "Temperature elevee"
             )
 
 
@@ -103,25 +764,14 @@ def calculer_risque(etat):
     )
 
 
-    if (
-        humidite
-        is not None
-    ):
+    if humidite is not None:
 
         if humidite > 70:
 
             score += 15
 
             raisons.append(
-                "Humidité critique"
-            )
-
-        elif humidite > 65:
-
-            score += 5
-
-            raisons.append(
-                "Humidité élevée"
+                "Humidite critique"
             )
 
 
@@ -149,11 +799,8 @@ def calculer_risque(etat):
 
 
     return {
-
         "score": score,
-
         "niveau": niveau,
-
         "raisons": raisons
     }
 
@@ -175,17 +822,21 @@ def correlation(
         return None
 
 
-    moyenne_x = statistics.mean(
-        x
+    moyenne_x = (
+        statistics.mean(
+            x
+        )
     )
 
-    moyenne_y = statistics.mean(
-        y
+
+    moyenne_y = (
+        statistics.mean(
+            y
+        )
     )
 
 
     numerateur = sum(
-
         (
             a - moyenne_x
         )
@@ -202,7 +853,7 @@ def correlation(
     )
 
 
-    denominateur_x = sum(
+    dx = sum(
         (
             a - moyenne_x
         ) ** 2
@@ -210,7 +861,7 @@ def correlation(
     )
 
 
-    denominateur_y = sum(
+    dy = sum(
         (
             b - moyenne_y
         ) ** 2
@@ -219,9 +870,7 @@ def correlation(
 
 
     denominateur = math.sqrt(
-        denominateur_x
-        *
-        denominateur_y
+        dx * dy
     )
 
 
@@ -239,65 +888,13 @@ def correlation(
 
 
 # ==========================================================
-# PAGES
-# ==========================================================
-
-@app.route("/")
-def dashboard():
-
-    return render_template(
-        "dashboard.html"
-    )
-
-
-@app.route("/architecture")
-def architecture():
-
-    return render_template(
-        "architecture.html"
-    )
-
-
-@app.route("/cablage")
-def cablage():
-
-    return render_template(
-        "cablage.html"
-    )
-
-
-@app.route("/alertes")
-def alertes():
-
-    return render_template(
-
-        "alertes.html",
-
-        evenements=
-            lire_evenements(
-                200
-            ),
-
-        mesures=
-            lire_mesures(
-                100
-            )
-    )
-
-
-@app.route("/parametres")
-def parametres():
-
-    return render_template(
-        "parametres.html"
-    )
-
-
-# ==========================================================
 # API STATUS
 # ==========================================================
 
-@app.route("/api/status")
+@app.route(
+    "/api/status"
+)
+@login_required
 def api_status():
 
     donnees = obtenir_etat()
@@ -323,10 +920,13 @@ def api_status():
 
 
 # ==========================================================
-# API DATA ANALYTICS
+# API ANALYTICS
 # ==========================================================
 
-@app.route("/api/analytics")
+@app.route(
+    "/api/analytics"
+)
+@login_required
 def analytics():
 
     try:
@@ -352,8 +952,10 @@ def analytics():
     )
 
 
-    mesures = lire_mesures_depuis(
-        heures
+    mesures = (
+        lire_mesures_depuis(
+            heures
+        )
     )
 
 
@@ -365,73 +967,66 @@ def analytics():
 
 
     temperatures = [
-
         float(
-            m["temperature"]
+            x["temperature"]
         )
-
-        for m in mesures
-
-        if m["temperature"]
+        for x in mesures
+        if x["temperature"]
         is not None
     ]
 
 
     humidites = [
-
         float(
-            m["humidite"]
+            x["humidite"]
         )
-
-        for m in mesures
-
-        if m["humidite"]
+        for x in mesures
+        if x["humidite"]
         is not None
     ]
 
 
-    def statistiques(
+    def stats(
         valeurs
     ):
 
         if not valeurs:
 
             return {
-
                 "moyenne": None,
-
                 "minimum": None,
-
                 "maximum": None,
-
                 "ecart_type": None
             }
 
 
         return {
 
-            "moyenne": round(
-                statistics.mean(
-                    valeurs
+            "moyenne":
+                round(
+                    statistics.mean(
+                        valeurs
+                    ),
+                    2
                 ),
-                2
-            ),
 
-            "minimum": round(
-                min(
-                    valeurs
+            "minimum":
+                round(
+                    min(
+                        valeurs
+                    ),
+                    2
                 ),
-                2
-            ),
 
-            "maximum": round(
-                max(
-                    valeurs
+            "maximum":
+                round(
+                    max(
+                        valeurs
+                    ),
+                    2
                 ),
-                2
-            ),
 
-            "ecart_type": (
+            "ecart_type":
                 round(
                     statistics.pstdev(
                         valeurs
@@ -442,7 +1037,6 @@ def analytics():
                     valeurs
                 ) > 1
                 else 0
-            )
         }
 
 
@@ -452,21 +1046,18 @@ def analytics():
 
         "Mouvement": 0,
 
-        "Température": 0,
+        "Temperature": 0,
 
-        "Humidité": 0,
+        "Humidite": 0,
 
-        "Système": 0
+        "Systeme": 0
     }
 
 
     mouvements = 0
-
     alertes = 0
-
-    reconnaissances_ok = 0
-
-    reconnaissances_echec = 0
+    ok = 0
+    echecs = 0
 
 
     for event in evenements:
@@ -475,18 +1066,14 @@ def analytics():
             "type"
         ]
 
-
         niveau = event[
             "niveau"
         ]
 
 
-        if (
-            type_event
-            in (
-                "RECONNAISSANCE",
-                "ALERTE_RECONNAISSANCE"
-            )
+        if type_event in (
+            "RECONNAISSANCE",
+            "ALERTE_RECONNAISSANCE"
         ):
 
             repartition[
@@ -504,30 +1091,32 @@ def analytics():
         elif type_event == "ALERTE_TEMPERATURE":
 
             repartition[
-                "Température"
+                "Temperature"
             ] += 1
 
 
         elif type_event == "ALERTE_HUMIDITE":
 
             repartition[
-                "Humidité"
+                "Humidite"
             ] += 1
 
 
         else:
 
             repartition[
-                "Système"
+                "Systeme"
             ] += 1
 
 
         if (
             type_event
             == "MOUVEMENT"
-            and event.get(
+            and
+            event.get(
                 "valeur"
-            ) == "DETECTE"
+            )
+            == "DETECTE"
         ):
 
             mouvements += 1
@@ -544,8 +1133,10 @@ def analytics():
         if (
             type_event
             == "RECONNAISSANCE"
-            and niveau == "INFO"
-            and event.get(
+            and
+            niveau == "INFO"
+            and
+            event.get(
                 "valeur"
             )
             not in (
@@ -554,63 +1145,48 @@ def analytics():
             )
         ):
 
-            reconnaissances_ok += 1
+            ok += 1
 
 
         if (
             type_event
             == "RECONNAISSANCE"
-            and niveau
+            and
+            niveau
             == "ATTENTION"
         ):
 
-            reconnaissances_echec += 1
+            echecs += 1
 
 
-    total_reconnaissance = (
-        reconnaissances_ok
-        +
-        reconnaissances_echec
+    total = (
+        ok + echecs
     )
 
 
-    if total_reconnaissance:
-
-        taux_reconnaissance = round(
-
-            (
-                reconnaissances_ok
-                /
-                total_reconnaissance
-            )
-            *
-            100,
-
+    taux = (
+        round(
+            ok / total * 100,
             1
         )
-
-    else:
-
-        taux_reconnaissance = 0
+        if total > 0
+        else 0
+    )
 
 
     return jsonify({
 
-        "periode_heures":
-            heures,
-
-        "mesures":
-            mesures,
+        "mesures": mesures,
 
         "statistiques": {
 
             "temperature":
-                statistiques(
+                stats(
                     temperatures
                 ),
 
             "humidite":
-                statistiques(
+                stats(
                     humidites
                 ),
 
@@ -633,29 +1209,29 @@ def analytics():
                 alertes,
 
             "reconnaissances_ok":
-                reconnaissances_ok,
+                ok,
 
             "reconnaissances_echec":
-                reconnaissances_echec,
+                echecs,
 
             "taux_reconnaissance":
-                taux_reconnaissance
+                taux
         }
-
     })
 
 
 # ==========================================================
-# ALARME ON / OFF
+# SIRENE ON/OFF
 # ==========================================================
 
 @app.route(
     "/api/alarme",
     methods=["POST"]
 )
+@login_required
 def alarme_api():
 
-    donnees = (
+    data = (
         request.get_json(
             silent=True
         )
@@ -664,7 +1240,7 @@ def alarme_api():
 
 
     active = bool(
-        donnees.get(
+        data.get(
             "active",
             True
         )
@@ -676,10 +1252,22 @@ def alarme_api():
     )
 
 
+    ajouter_audit(
+        current_user.username,
+        (
+            "ALARM_ENABLE"
+            if active
+            else
+            "ALARM_DISABLE"
+        ),
+        "SUCCES",
+        request.remote_addr,
+        "Commande depuis dashboard"
+    )
+
+
     return jsonify({
-
         "success": True,
-
         "active": active
     })
 
@@ -692,38 +1280,87 @@ def alarme_api():
     "/api/alarme/test",
     methods=["POST"]
 )
+@login_required
 def alarme_test():
 
     tester_alarme()
 
 
-    return jsonify({
+    ajouter_audit(
+        current_user.username,
+        "ALARM_TEST",
+        "SUCCES",
+        request.remote_addr,
+        "Test manuel sirene"
+    )
 
+
+    return jsonify({
         "success": True
     })
 
 
 # ==========================================================
-# HISTORIQUE
+# HEADERS SECURITE
 # ==========================================================
 
-@app.route(
-    "/api/historique"
-)
-def historique_api():
+@app.after_request
+def security_headers(
+    response
+):
 
-    return jsonify({
+    response.headers[
+        "X-Content-Type-Options"
+    ] = "nosniff"
 
-        "evenements":
-            lire_evenements(
-                200
-            ),
 
-        "mesures":
-            lire_mesures(
-                200
-            )
-    })
+    response.headers[
+        "X-Frame-Options"
+    ] = "DENY"
+
+
+    response.headers[
+        "Referrer-Policy"
+    ] = "same-origin"
+
+
+    response.headers[
+        "Permissions-Policy"
+    ] = (
+        "camera=(), "
+        "microphone=(), "
+        "geolocation=()"
+    )
+
+
+    if current_user.is_authenticated:
+
+        response.headers[
+            "Cache-Control"
+        ] = (
+            "no-store, "
+            "no-cache, "
+            "must-revalidate"
+        )
+
+
+    return response
+
+
+# ==========================================================
+# RATE LIMIT ERROR
+# ==========================================================
+
+@app.errorhandler(429)
+def ratelimit_error(
+    erreur
+):
+
+    return (
+        "Trop de tentatives. "
+        "Reessayez dans une minute.",
+        429
+    )
 
 
 # ==========================================================
@@ -740,15 +1377,16 @@ if __name__ == "__main__":
         "================================"
     )
     print(
-        " SENTINEL-X SECURITY DATA CENTER"
+        " SENTINEL-X SECURE PLATFORM"
     )
     print(
         "================================"
     )
     print()
 
+
     print(
-        "http://127.0.0.1:5000"
+        "http://127.0.0.1:5000/login"
     )
 
     print()
@@ -758,12 +1396,8 @@ if __name__ == "__main__":
 
 
     app.run(
-
         host="127.0.0.1",
-
         port=5000,
-
         debug=False,
-
         use_reloader=False
     )

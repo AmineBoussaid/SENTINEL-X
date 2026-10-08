@@ -1,3 +1,14 @@
+function getCsrfToken() {
+
+    return document
+        .querySelector(
+            'meta[name="csrf-token"]'
+        )
+        .getAttribute(
+            "content"
+        );
+}
+
 let environmentChart = null;
 let eventsChart = null;
 let correlationChart = null;
@@ -831,7 +842,10 @@ async function toggleAlarm() {
             headers: {
 
                 "Content-Type":
-                    "application/json"
+                    "application/json",
+
+                "X-CSRFToken":
+                    getCsrfToken()
             },
 
             body:
@@ -854,8 +868,13 @@ async function testAlarm() {
         "/api/alarme/test",
         {
 
-            method:
-                "POST"
+            method: "POST",
+
+            headers: {
+
+                "X-CSRFToken":
+                    getCsrfToken()
+            }
         }
     );
 }
